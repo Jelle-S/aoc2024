@@ -44,8 +44,9 @@ We can first check if the two equations have the same slope
 If it isn't, there is no possible solution, and the prize cannot be reached with
 these buttons.
 
-If it is, divide the prize's $`x`$ by the buttons $`\Delta x`$ and multiply it
-by the button's cost. Lowest number is the most efficient one.
+If it is, divide the prize's $`x`$ (so $`c_1`$) by the buttons $`\Delta x`$
+(so $`a_1`$) and multiply it by the button's cost. Lowest number is the most 
+efficient one.
 
 If the slopes are different, we have exactly one possible answer, so the 
 button's cost doens't matter anyway.
