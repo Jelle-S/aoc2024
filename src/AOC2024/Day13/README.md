@@ -1,6 +1,6 @@
 # The math
 
-Watch out! Psuedo math incoming. Thanks to my lovely wife for explaining this
+Watch out! Pseudo math incoming. Thanks to my lovely wife for explaining this
 to my simple mind.
 
 Given:
