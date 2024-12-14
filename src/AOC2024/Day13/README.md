@@ -74,7 +74,7 @@ a_1a_2 & a_1b_2 & a_1c_2
 $$
 
 Then... And I don't know _why_ this is true, but I'll just have to accept that
-it is:
+it is ([I've figured out _why_!](##i've-figured-out-_why_!)):
 
 In this system of linear equations:
 
@@ -107,7 +107,7 @@ $$
 
 
 Then... And again: I don't know _why_ this is true, but I'll just have to accept
-that it is:
+that it is ([I've figured out _why_!](##i've-figured-out-_why_!)):
 
 In this system of linear equations:
 
@@ -128,3 +128,36 @@ $$
 
 Now "all" I have to do is translate this info into an algorithm. Easy peasy
 lemon squeezy.
+
+---
+
+### Footnotes
+
+#### I've figured out _why_!
+ 
+Basically it's just this for $`y`$ and the same priciple for $`x`$:
+
+$$
+\begin{gather}
+a_1x + b_1y = c_1 \\
+a_2x + b_2y = c_2 \\
+\\
+\text{So:} \\
+\\
+a_1x + b_1y - c_1 = 0 \\
+a_2x + b_2y - c_2 = 0 \\
+\\
+\text{Meaning:} \\
+\\
+a_1x + b_1y - c_1 = a_2x + b_2y - c_2 \\
+\\
+\text{And then we can just solve it by multiplying both sides to eliminate } x \\
+\\
+a_2a_1x + a_2b_1y - a_2c_1 = a_1a_2x + a_1b_2y - a_1c_2 \\
+a_2b_1y - a_2c_1 = a_1b_2y - a_1c_2 \\
+a_2b_1y - a_2c_1 - a_1b_2y + a_1c_2 = 0 \\
+a_2b_1y - a_1b_2y = a_2c_1 - a_1c_2 \\
+y(a_2b_1 - a_1b_2) = a_2c_1 - a_1c_2 \\
+y = \frac{a_2c_1 - a_1c_2}{a_2b_1 - a_1b_2}
+\end{gather}
+$$
