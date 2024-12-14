@@ -37,13 +37,7 @@ class Puzzle1 implements PuzzleInterface {
     }
 
     protected function getEndQuadrant($p, $v) {
-        $endPos = [
-            $p[0] + ($v[0] * $this->time) % $this->width,
-            $p[1] + ($v[1] * $this->time) % $this->height,
-        ];
-
-        $endPos[0] = ($endPos[0] % $this->width + $this->width) % $this->width;
-        $endPos[1] = ($endPos[1] % $this->height + $this->height) % $this->height;
+        $endPos = $this->getEndPos($p, $v);
 
         $middleRow = ($this->height - 1) / 2;
         $middleCol = ($this->width - 1) / 2;
@@ -65,5 +59,17 @@ class Puzzle1 implements PuzzleInterface {
             case "10":
                 return 3;
         }
+    }
+
+    protected function getEndPos($p, $v) {
+        $endPos = [
+            $p[0] + ($v[0] * $this->time) % $this->width,
+            $p[1] + ($v[1] * $this->time) % $this->height,
+        ];
+
+        $endPos[0] = ($endPos[0] % $this->width + $this->width) % $this->width;
+        $endPos[1] = ($endPos[1] % $this->height + $this->height) % $this->height;
+
+        return $endPos;
     }
 }
