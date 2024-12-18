@@ -1,209 +1,195 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BFS Visualization</title>
-    <style>
-      body {
-        background-color: black;
-        color: white;
-        font-family: Arial, sans-serif;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 20px;
-      }
-      textarea {
-        width: 300px;
-        height: 150px;
-        margin-bottom: 20px;
-        font-family: monospace;
-      }
-      svg {
-        border: 1px solid white;
-        margin-top: 20px;
-      }
-    </style>
-  </head>
-  <body>
-    <h1>BFS Visualization</h1>
-    <p>Enter grid data (e.g., "row,column" on each line):</p>
-    <textarea id="gridInput"></textarea>
-    <button id="startButton">Start BFS</button>
-    <div id="svgContainer"></div>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BFS Visualization with D3.js</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      background-color: black;
+      color: white;
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    textarea {
+      width: 300px;
+      height: 150px;
+      margin-bottom: 20px;
+      font-family: monospace;
+    }
+    svg {
+      border: 1px solid white;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>BFS Visualization with D3.js</h1>
+  <p>Enter grid data (e.g., "row,column" on each line):</p>
+  <textarea id="gridInput"></textarea>
+  <button id="startButton">Start BFS</button>
+  <div id="svgContainer"></div>
 
-    <script>
-      class BFSVisualizer {
-        constructor(gridSize, inputData) {
-          this.gridSize = gridSize;
-          this.fallenBytes = new Set();
-          this.blockingByte = null;
-          this.frames = [];
-          this.visited = new Set();
-          this.path = [];
-          this.grid = null;
+  <script>
+    class BFSVisualizer {
+      constructor(gridSize, inputData) {
+        this.gridSize = gridSize;
+        this.cellSize = 10; // Each cell is 10x10 pixels
+        this.fallenBytes = new Set();
+        this.blockingByte = null;
+        this.frames = [];
+        this.visited = new Set();
 
-          // Parse input data
-          inputData.trim().split("\n").forEach(line => {
-            const [c, r] = line.split(",").map(Number);
-            this.fallenBytes.add(`${r},${c}`);
+        // Parse input data
+        inputData.trim().split("\n").forEach(line => {
+          const [c, r] = line.split(",").map(Number);
+          this.fallenBytes.add(`${r},${c}`);
+        });
+
+        // Initialize grid data
+        this.gridData = Array.from({ length: gridSize * gridSize }, (_, i) => {
+          const row = Math.floor(i / gridSize);
+          const col = i % gridSize;
+          return { row, col, state: "empty" };
+        });
+      }
+
+      // Initializes the grid using D3.js
+      initGrid() {
+        const svg = d3.select("#svgContainer")
+          .append("svg")
+          .attr("width", this.gridSize * this.cellSize)
+          .attr("height", this.gridSize * this.cellSize);
+
+        // Bind grid data to rect elements
+        svg.selectAll("rect")
+          .data(this.gridData, d => `${d.row}-${d.col}`) // Use row-col as key
+          .enter()
+          .append("rect")
+          .attr("x", d => d.col * this.cellSize)
+          .attr("y", d => d.row * this.cellSize)
+          .attr("width", this.cellSize)
+          .attr("height", this.cellSize)
+          .attr("fill", d => (this.fallenBytes.has(`${d.row},${d.col}`) ? "white" : "black"))
+          .attr("stroke", "black");
+
+        this.svg = svg;
+      }
+
+      // Updates the grid visualization for each frame
+      updateGrid(frame) {
+        this.svg.selectAll("rect")
+          .data(this.gridData, d => `${d.row}-${d.col}`)
+          .transition()
+          .duration(1) // 100ms per frame
+          .attr("fill", d => {
+            if (frame.path.some(([r, c]) => r === d.row && c === d.col)) return "red";
+            if (frame.visited.has(`${d.row},${d.col}`)) return "green";
+            if (frame.fallenBytes.has(`${d.row},${d.col}`)) return "white";
+            return "black";
           });
-        }
+      }
 
-        // Initializes the SVG grid
-        initGrid() {
-          const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-          svg.setAttribute("width", this.gridSize * 10);
-          svg.setAttribute("height", this.gridSize * 10);
-          svg.style.background = "black";
+      // Runs the BFS algorithm and tracks changes for rendering
+      bfsWithFrames(startRow, startCol, endRow, endCol) {
+        const q = [[startRow, startCol, 0, [[startRow, startCol]]]]; // [row, col, steps, path]
+        const directions = [
+          [1, 0], [0, 1], [-1, 0], [0, -1]
+        ];
 
-          this.grid = svg;
-          document.getElementById("svgContainer").appendChild(svg);
+        this.visited = new Set();
+        this.visited.add(`${startRow},${startCol}`);
 
-          // Draw fallen bytes (static)
-          this.fallenBytes.forEach(key => {
-            const [r, c] = key.split(",").map(Number);
-            this.drawCell(r, c, "white");
-          });
-        }
+        while (q.length > 0) {
+          const [r, c, steps, path] = q.shift();
 
-        // Draws a cell in the grid
-        drawCell(row, col, color) {
-          const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-          rect.setAttribute("x", col * 10);
-          rect.setAttribute("y", row * 10);
-          rect.setAttribute("width", 10);
-          rect.setAttribute("height", 10);
-          rect.setAttribute("rx", 2); // Rounded corners
-          rect.setAttribute("fill", color);
-          this.grid.appendChild(rect);
-        }
+          // Capture frame
+          this.frames.push({ visited: new Set(this.visited), path: [...path], fallenBytes: new Set(this.fallenBytes) });
 
-        // Runs the BFS algorithm and tracks changes to render
-        bfsWithFrames(startRow, startCol, endRow, endCol) {
-          const q = [[startRow, startCol, 0, [[startRow, startCol]]]]; // [row, col, steps, path]
-          const directions = [
-            [1, 0], [0, 1], [-1, 0], [0, -1]
-          ];
-
-          this.visited = new Set();
-          this.visited.add(`${startRow},${startCol}`);
-
-          while (q.length > 0) {
-            const [r, c, steps, path] = q.shift();
-            this.frames.push({visited: new Set(this.visited), path: [...path], blockingByte: [...this.blockingByte]});
-
-            if (r === endRow && c === endCol) {
-              return steps;
-            }
-
-            for (const [dr, dc] of directions) {
-              const nr = r + dr;
-              const nc = c + dc;
-
-              if (
-                      nr >= 0 && nc >= 0 &&
-                      nr < this.gridSize && nc < this.gridSize &&
-                      !this.fallenBytes.has(`${nr},${nc}`) &&
-                      !this.visited.has(`${nr},${nc}`)
-                      ) {
-                this.visited.add(`${nr},${nc}`);
-                const newPath = [...path, [nr, nc]];
-                q.push([nr, nc, steps + 1, newPath]);
-              }
-            }
-          }
-          return -1; // If no path found
-        }
-
-        // Updates the frame incrementally (only changed cells)
-        updateFrame(frame, lastPath, lastBlockingByte) {
-          const {visited, path, blockingByte} = frame;
-
-          if (lastBlockingByte.join(',') !== blockingByte.join(',')) {
-            visited.forEach((v) => {
-              this.drawCell(...v.split(",").map(Number), "green");
-            });
+          if (r === endRow && c === endCol) {
+            return steps;
           }
 
-          // Draw removed blocking byte as black.
-          this.drawCell(blockingByte[0], blockingByte[1], 'black');
+          for (const [dr, dc] of directions) {
+            const nr = r + dr;
+            const nc = c + dc;
 
-          // Remove the last path (turn previous path cells green)
-          lastPath.forEach(([r, c]) => {
-            this.drawCell(r, c, "green");
-          });
-
-          // Draw current path
-          path.forEach(([r, c]) => {
-            this.drawCell(r, c, "red"); // Red
-          });
-
-          return [path, blockingByte];
-        }
-
-        // Plays the animation for Puzzle2
-        playAnimation() {
-          let frameIndex = 0;
-          let lastPath = [];
-          let lastBlockingByte = this.frames[0].blockingByte;
-
-          const renderFrame = () => {
-            frameIndex++;
-            // Update frame (only changed cells)
-            [lastPath, lastBlockingByte] = this.updateFrame(this.frames[frameIndex], lastPath, lastBlockingByte);
-
-            if (frameIndex < this.frames.length) {
-              setTimeout(() => {requestAnimationFrame(() => {
-                  [lastPath, lastBlockingByte] = this.updateFrame(this.frames[frameIndex], lastPath, lastBlockingByte);
-                  renderFrame();});},
-              1); // Render next frame after 50ms
-            }
-          };
-
-          requestAnimationFrame(() => {renderFrame();});
-        }
-
-        // Puzzle2 Logic to handle blocking bytes
-        solvePuzzle() {
-          let result = 0;
-
-          // Start from a grid with all fallen bytes
-          while (this.fallenBytes.size > 0) {
-            this.blockingByte = Array.from(this.fallenBytes).pop().split(",").map(Number);  // Get the last fallen byte
-            this.fallenBytes.delete(this.blockingByte.join(",")); // Remove it from the set of fallen bytes
-
-            // Run BFS
-            const steps = this.bfsWithFrames(0, 0, this.gridSize - 1, this.gridSize - 1);
-
-            if (steps !== -1) {
-              result = steps;
-              break;
+            if (
+              nr >= 0 && nc >= 0 &&
+              nr < this.gridSize && nc < this.gridSize &&
+              !this.fallenBytes.has(`${nr},${nc}`) &&
+              !this.visited.has(`${nr},${nc}`)
+            ) {
+              this.visited.add(`${nr},${nc}`);
+              const newPath = [...path, [nr, nc]];
+              q.push([nr, nc, steps + 1, newPath]);
             }
           }
-
-          return this.blockingByte ? this.blockingByte.reverse().join(",") : null;
         }
+        return -1; // No path found
       }
 
-      // Start button handler
-      document.getElementById("startButton").addEventListener("click", () => {
-        const input = document.getElementById("gridInput").value;
-        const gridSize = 71; // 71x71 grid
+      // Plays the animation for the BFS visualization
+      playAnimation() {
+        let frameIndex = 0;
 
-        // Clear previous SVG if any
-        const container = document.getElementById("svgContainer");
-        container.innerHTML = "";
+        const renderFrame = () => {
+          let renderEvery = 15;
+          if (frameIndex < this.frames.length) {
+            this.updateGrid(this.frames[frameIndex]); // Update the grid with the current frame
+            frameIndex+=renderEvery;
+            setTimeout(renderFrame, 1); // Render next frame after 1ms
+            return;
+          }
+          frameIndex = this.frames.length - 1;
+          this.updateGrid(this.frames[frameIndex]); // Update the grid with the current frame
+        };
 
-        // Initialize and run Puzzle2
-        const bfsVisualizer = new BFSVisualizer(gridSize, input);
-        bfsVisualizer.initGrid();
-        const blockingByte = bfsVisualizer.solvePuzzle(); // Run Puzzle2 logic
+        renderFrame();
+      }
 
-        console.log(`Blocking Byte: ${blockingByte}`);
-        bfsVisualizer.playAnimation();
-      });
-    </script>
-  </body>
+      solvePuzzle() {
+        let result = 0;
+
+        // Start from a grid with all fallen bytes
+        while (this.fallenBytes.size > 0) {
+          this.blockingByte = Array.from(this.fallenBytes).pop().split(",").map(Number);  // Get the last fallen byte
+          this.fallenBytes.delete(this.blockingByte.join(",")); // Remove it from the set of fallen bytes
+
+          // Run BFS
+          const steps = this.bfsWithFrames(0, 0, this.gridSize - 1, this.gridSize - 1);
+
+          if (steps !== -1) {
+            result = steps;
+            break;
+          }
+        }
+
+        return this.blockingByte ? this.blockingByte.reverse().join(",") : null;
+      }
+    }
+
+    // Start button handler
+    document.getElementById("startButton").addEventListener("click", () => {
+      const input = document.getElementById("gridInput").value;
+      const gridSize = 71; // 71x71 grid
+
+      // Clear previous SVG if any
+      const container = document.getElementById("svgContainer");
+      container.innerHTML = "";
+
+      // Initialize and run BFS visualization
+      const bfsVisualizer = new BFSVisualizer(gridSize, input);
+      bfsVisualizer.initGrid();
+      const blockingByte = bfsVisualizer.solvePuzzle(); // Run Puzzle2 logic
+
+      console.log(`Blocking Byte: ${blockingByte}`);
+      bfsVisualizer.playAnimation();
+    });
+  </script>
+</body>
 </html>
