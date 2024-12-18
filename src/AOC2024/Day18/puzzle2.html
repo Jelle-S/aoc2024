@@ -150,16 +150,11 @@
           let lastBlockingByte = this.frames[0].blockingByte;
 
           const renderFrame = () => {
-            let frameIndexDelta = 1;
-            while (frameIndex < this.frames.length && this.frames[frameIndex].blockingByte.join(',') === lastBlockingByte.join(',')) {
-              frameIndexDelta = 0;
-              // Update frame (only changed cells)
-              [lastPath, lastBlockingByte] = this.updateFrame(this.frames[frameIndex], lastPath, lastBlockingByte);
-              frameIndex++;
-            }
+            frameIndex++;
+            // Update frame (only changed cells)
+            [lastPath, lastBlockingByte] = this.updateFrame(this.frames[frameIndex], lastPath, lastBlockingByte);
 
             if (frameIndex < this.frames.length) {
-              frameIndex += frameIndexDelta;
               setTimeout(() => {requestAnimationFrame(() => {
                   [lastPath, lastBlockingByte] = this.updateFrame(this.frames[frameIndex], lastPath, lastBlockingByte);
                   renderFrame();});},
