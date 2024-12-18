@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BFS Visualization</title>
+    <style>
+      body {
+        background-color: black;
+        color: white;
+        font-family: Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px;
+      }
+      textarea {
+        width: 300px;
+        height: 150px;
+        margin-bottom: 20px;
+        font-family: monospace;
+      }
+      svg {
+        border: 1px solid white;
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>BFS Visualization</h1>
+    <p>Enter grid data (e.g., "row,column" on each line):</p>
+    <textarea id="gridInput"></textarea>
+    <button id="startButton">Start BFS</button>
+    <div id="svgContainer"></div>
+
+    <script>
+      class BFSVisualizer {
+        constructor(gridSize, inputData) {
+          this.gridSize = gridSize;
+          this.fallenBytes = new Set();
+          this.blockingByte = null;
+          this.frames = [];
+          this.visited = new Set();
+          this.path = [];
+          this.grid = null;
+
+          // Parse input data
+          inputData.trim().split("\n").forEach(line => {
+            const [c, r] = line.split(",").map(Number);
+            this.fallenBytes.add(`${r},${c}`);
+          });
+        }
+
+        // Initializes the SVG grid
+        initGrid() {
+          const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+          svg.setAttribute("width", this.gridSize * 10);
+          svg.setAttribute("height", this.gridSize * 10);
+          svg.style.background = "black";
+
+          this.grid = svg;
+          document.getElementById("svgContainer").appendChild(svg);
+
+          // Draw fallen bytes (static)
+          this.fallenBytes.forEach(key => {
+            const [r, c] = key.split(",").map(Number);
+            this.drawCell(r, c, "white");
+          });
+        }
+
+        // Draws a cell in the grid
+        drawCell(row, col, color) {
+          const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+          rect.setAttribute("x", col * 10);
+          rect.setAttribute("y", row * 10);
+          rect.setAttribute("width", 10);
+          rect.setAttribute("height", 10);
+          rect.setAttribute("rx", 2); // Rounded corners
+          rect.setAttribute("fill", color);
+          this.grid.appendChild(rect);
+        }
+
+        // Runs the BFS algorithm and tracks changes to render
+        bfsWithFrames(startRow, startCol, endRow, endCol) {
+          const q = [[startRow, startCol, 0, [[startRow, startCol]]]]; // [row, col, steps, path]
+          const directions = [
+            [1, 0], [0, 1], [-1, 0], [0, -1]
+          ];
+
+          this.visited = new Set();
+          this.visited.add(`${startRow},${startCol}`);
+
+          while (q.length > 0) {
+            const [r, c, steps, path] = q.shift();
+            this.frames.push({visited: new Set(this.visited), path: [...path], blockingByte: [...this.blockingByte]});
+
+            if (r === endRow && c === endCol) {
+              return steps;
+            }
+
+            for (const [dr, dc] of directions) {
+              const nr = r + dr;
+              const nc = c + dc;
+
+              if (
+                      nr >= 0 && nc >= 0 &&
+                      nr < this.gridSize && nc < this.gridSize &&
+                      !this.fallenBytes.has(`${nr},${nc}`) &&
+                      !this.visited.has(`${nr},${nc}`)
+                      ) {
+                this.visited.add(`${nr},${nc}`);
+                const newPath = [...path, [nr, nc]];
+                q.push([nr, nc, steps + 1, newPath]);
+              }
+            }
+          }
+          return -1; // If no path found
+        }
+
+        // Updates the frame incrementally (only changed cells)
+        updateFrame(frame, lastPath, lastBlockingByte) {
+          const {visited, path, blockingByte} = frame;
+
+          if (lastBlockingByte.join(',') !== blockingByte.join(',')) {
+            visited.forEach((v) => {
+              this.drawCell(...v.split(",").map(Number), "green");
+            });
+          }
+
+          // Draw removed blocking byte as black.
+          this.drawCell(blockingByte[0], blockingByte[1], 'black');
+
+          // Remove the last path (turn previous path cells green)
+          lastPath.forEach(([r, c]) => {
+            this.drawCell(r, c, "green");
+          });
+
+          // Draw current path
+          path.forEach(([r, c]) => {
+            this.drawCell(r, c, "red"); // Red
+          });
+
+          return [path, blockingByte];
+        }
+
+        // Plays the animation for Puzzle2
+        playAnimation() {
+          let frameIndex = 0;
+          let lastPath = [];
+          let lastBlockingByte = this.frames[0].blockingByte;
+
+          const renderFrame = () => {
+            let frameIndexDelta = 1;
+            while (frameIndex < this.frames.length && this.frames[frameIndex].blockingByte.join(',') === lastBlockingByte.join(',')) {
+              frameIndexDelta = 0;
+              // Update frame (only changed cells)
+              [lastPath, lastBlockingByte] = this.updateFrame(this.frames[frameIndex], lastPath, lastBlockingByte);
+              frameIndex++;
+            }
+
+            if (frameIndex < this.frames.length) {
+              frameIndex += frameIndexDelta;
+              setTimeout(() => {requestAnimationFrame(() => {
+                  [lastPath, lastBlockingByte] = this.updateFrame(this.frames[frameIndex], lastPath, lastBlockingByte);
+                  renderFrame();});},
+              1); // Render next frame after 50ms
+            }
+          };
+
+          requestAnimationFrame(() => {renderFrame();});
+        }
+
+        // Puzzle2 Logic to handle blocking bytes
+        solvePuzzle() {
+          let result = 0;
+
+          // Start from a grid with all fallen bytes
+          while (this.fallenBytes.size > 0) {
+            this.blockingByte = Array.from(this.fallenBytes).pop().split(",").map(Number);  // Get the last fallen byte
+            this.fallenBytes.delete(this.blockingByte.join(",")); // Remove it from the set of fallen bytes
+
+            // Run BFS
+            const steps = this.bfsWithFrames(0, 0, this.gridSize - 1, this.gridSize - 1);
+
+            if (steps !== -1) {
+              result = steps;
+              break;
+            }
+          }
+
+          return this.blockingByte ? this.blockingByte.reverse().join(",") : null;
+        }
+      }
+
+      // Start button handler
+      document.getElementById("startButton").addEventListener("click", () => {
+        const input = document.getElementById("gridInput").value;
+        const gridSize = 71; // 71x71 grid
+
+        // Clear previous SVG if any
+        const container = document.getElementById("svgContainer");
+        container.innerHTML = "";
+
+        // Initialize and run Puzzle2
+        const bfsVisualizer = new BFSVisualizer(gridSize, input);
+        bfsVisualizer.initGrid();
+        const blockingByte = bfsVisualizer.solvePuzzle(); // Run Puzzle2 logic
+
+        console.log(`Blocking Byte: ${blockingByte}`);
+        bfsVisualizer.playAnimation();
+      });
+    </script>
+  </body>
+</html>
