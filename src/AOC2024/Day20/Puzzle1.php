@@ -13,7 +13,6 @@ class Puzzle1 implements PuzzleInterface {
 
   public function solve() {
     $result = 0;
-    $result = 0;
 
     $h = fopen($this->input, 'r');
     $sr = $sc = $er = $ec = 0;
@@ -34,27 +33,28 @@ class Puzzle1 implements PuzzleInterface {
     fclose($h);
 
     $path = $this->getNoCheatPath($sr, $sc, $er, $ec);
+    $sortedr = $sortedc = $path;
+    usort($sortedr, fn ($a, $b) => ($a[0] - $b[0] === 0 ? $a[1] - $b[1] : $a[0] - $b[0]));
+    usort($sortedc, fn ($a, $b) => ($a[1] - $b[1] === 0 ? $a[0] - $b[0] : $a[1] - $b[1]));
 
-    foreach (array_slice($path, 0, -100) as $step => $cheatPoint) {
-      if ($this->hasShortCut($cheatPoint, array_slice($path, $step))) {
-        $result++;
-      }
+    for ($i = 0; $i < count($path) - 1; $i++) {
+      $result += (int) $this->isShortCut($sortedr[$i], $sortedr[$i + 1], 100);
+      $result += (int) $this->isShortCut($sortedc[$i], $sortedc[$i + 1], 100);
     }
-
     return $result;
   }
 
-  protected function getNoCheatPathTime(int $sr, int $sc, int $er, int $ec): int {
+  protected function getNoCheatPath(int $sr, int $sc, int $er, int $ec): array {
     $directions = [[0, 1], [1, 0], [0, -1], [-1, 0]];
     $visited = new \Ds\Set();
     $q = new \Ds\Queue();
 
-    $q->push([$sr, $sc, 0, [$sr, $sc]]);
+    $q->push([$sr, $sc, 0, [[$sr, $sc, 0]]]);
 
     while (!$q->isEmpty()) {
       list ($r, $c, $steps, $path) = $q->pop();
       if ($r === $er && $c === $ec) {
-        return $steps;
+        return $path;
       }
       foreach ($directions as $direction) {
         list($dr, $dc) = $direction;
@@ -64,55 +64,29 @@ class Puzzle1 implements PuzzleInterface {
           continue;
         }
         $visited->add([$nr, $nc]);
-        $q->push([$nr, $nc, $steps + 1, [...$path, [$nr, $nc]]]);
+        $q->push([$nr, $nc, $steps + 1, [...$path, [$nr, $nc, $steps + 1]]]);
       }
     }
 
     return 0;
   }
 
-  protected function countCheatPathsFasterThan(int $sr, int $sc, int $er, int $ec, int $time): int {
-    $count = 0;
-    $directions = [[0, 1], [1, 0], [0, -1], [-1, 0]];
-    $visited = new \Ds\Set();
-    $q = new \Ds\Queue();
-
-    $q->push([$sr, $sc, 0, [], [[$sr, $sc]]]);
-
-    while (!$q->isEmpty()) {
-      list ($r, $c, $steps, $usedCheat) = $q->pop();
-      if ($r === $er && $c === $ec) {
-        $count++;
-        continue;
-      }
-      foreach ($directions as $direction) {
-        list($dr, $dc) = $direction;
-        $nr = $r + $dr;
-        $nc = $c + $dc;
-        if (!$this->isInGrid($nr, $nc)) {
-          continue;
-        }
-        if ($this->grid[$nr][$nc] !== '#' && !$visited->contains([$nr, $nc, $usedCheat]) && $steps + 1 <= $time) {
-          $visited->add([$nr, $nc, $usedCheat]);
-          $q->push([$nr, $nc, $steps + 1, $usedCheat]);
-        }
-        if ($usedCheat) {
-          continue;
-        }
-        $cnr = $nr + $dr;
-        $cnc = $nc + $dc;
-        if (!$this->isInGrid($cnr, $cnc)) {
-          continue;
-        }
-        if ($this->grid[$cnr][$cnc] !== '#' && !$visited->contains([$cnr, $cnc, true]) && $steps + 2 <= $time) {
-          $visited->add([$cnr, $cnc, [$r, $c, $cnr, $cnc]]);
-          $q->push([$cnr, $cnc, $steps + 2, [$r, $c, $cnr, $cnc]]);
-          continue;
-        }
-      }
+  protected function isShortCut(array $a, array $b, int $saveSteps) {
+    list($ra, $ca, $stepa) = $a;
+    list($rb, $cb, $stepb) = $b;
+    if (abs($stepa - $stepb) <= $saveSteps) {
+      return false;
+    }
+    if ($ra !== $rb && $ca !== $cb) {
+      return false;
     }
 
-    return $count;
+    if (abs($ra - $rb) !== 2 && abs($ca - $cb) !== 2) {
+      return false;
+    }
+
+    list($r, $c) = [($ra + $rb) / 2, ($ca + $cb) / 2];
+    return $this->grid[$r][$c] === '#';
   }
 
   protected function isInGrid($r, $c) {
