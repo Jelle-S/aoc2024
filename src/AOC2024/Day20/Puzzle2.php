@@ -30,68 +30,41 @@ class Puzzle2 extends Puzzle1 {
     return $this->getShortCutCount($path);
   }
 
-  protected function getShortCutCount($path) {
-    $pathByR = $pathByC = [];
-
-    foreach ($path as $point) {
-      $pathByR[$point[0]] ??= [];
-      $pathByR[$point[0]][] = $point;
-      $pathByC[$point[1]] ??= [];
-      $pathByC[$point[1]][] = $point;
+  protected function getShortCutCount(array $path) {
+    $pathMap = new \Ds\Map();
+    foreach ($path as $pos) {
+      list($r, $c, $steps) = $pos;
+      $pathMap->put([$r, $c], $steps);
     }
-    $shortCuts = new \Ds\Set();
-    $skip = 76;
-    for ($i = 0; $i < count($path) - $skip; $i++) {
-      $start = $path[$i];
-      for ($j = $start[0] - 21; $j <= $start[0] + 21; $j++) {
-        if (!isset($pathByR[$j])) {
-          continue;
-        }
-        foreach ($pathByR[$j] as $dest) {
-          if ($this->manhattanDistance($path[$i], $dest) > 21) {
-            continue;
-          }
-          if ($dest[2] - $start[2] < $skip) {
-            continue;
-          }
-          $shortCuts->add([$path[$i], $dest]);
-        }
-      }
 
-      for ($j = $start[1] - 21; $j <= $start[1] + 21; $j++) {
-        if (!isset($pathByC[$j])) {
-          continue;
-        }
-        foreach ($pathByC[$j] as $dest) {
-          if ($this->manhattanDistance($path[$i], $dest) > 21) {
-            continue;
+    $count = 0;
+    foreach ($path as $pos) {
+      list ($r, $c) = $pos;
+      for ($distance = 2; $distance <= 20; $distance++) {
+        for ($dr = 0; $dr <= $distance; $dr++) {
+          // Manhattan distance: Sum of dc and dr is the full distance.
+          $dc = $distance - $dr;
+          // Set because if $dr = 0, $r+$dr === $r-$dr.
+          $neighbours = new \Ds\Set();
+          $neighbours->add(...[
+              [$r + $dr, $c + $dc],
+              [$r + $dr, $c - $dc],
+              [$r - $dr, $c + $dc],
+              [$r - $dr, $c - $dc],
+          ]);
+          foreach ($neighbours as $n) {
+            list ($nr, $nc) = $n;
+            if (!$this->isInGrid($nr, $nc) || $this->grid[$nr][$nc] === '#') {
+              continue;
+            }
+            if ($pathMap->get([$r, $c]) - $pathMap->get([$nr, $nc]) >= 100 + $distance) {
+              $count++;
+            }
           }
-          if ($dest[2] - $start[2] < $skip) {
-            continue;
-          }
-          $shortCuts->add([$path[$i], $dest]);
         }
       }
     }
-    print implode(
-      "\n",
-      array_map(
-        function ($v) {
-          return implode(
-            ': ',
-            array_map(
-              fn ($v2) => implode(', ', $v2),
-              $v
-            )
-          );
-        },
-        $shortCuts->toArray()
-      )
-    );
-    return $shortCuts->count();
-  }
 
-  protected function manhattanDistance($a, $b) {
-    return abs($a[0] - $b[0]) + abs($a[1] - $b[1]);
+    return $count;
   }
 }
