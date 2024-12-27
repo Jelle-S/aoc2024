@@ -15,54 +15,85 @@ class Puzzle2 extends Puzzle1 {
       $connections[$pcs[$i + 1]][] = $pcs[$i];
     }
 
-    $biggestLan = $this->bfs($connections);
-
-    return implode($biggestLan);
-  }
-
-  // Try a bfs of sorts that only adds a neighbour if it has links to all items
-  // in the path up until that neighbour, and only if they are also direct
-  // neighbours of the starting point?
-  // This works on the sample but uses way too much memory for the actual input.
-  protected function bfs($connections): array {
-    $biggestLan = [];
-    $checked = new \Ds\Set();
-
-    foreach ($connections as $pc => $links) {
-      $q = new \Ds\Queue();
-      $q->push([$pc, [$pc]]);
-      while (!$q->isEmpty()) {
-        list($p, $lan) = $q->pop();
-        if ($checked->contains($p)) {
-          continue;
-        }
-
-        $neighbours = $connections[$p];
-        foreach ($neighbours as $neighbour) {
-          if (in_array($neighbour, $lan) || !in_array($neighbour, $links)) {
-            continue;
-          }
-          $add = true;
-          foreach ($lan as $lanpc) {
-            if (!in_array($lanpc, $connections[$neighbour])) {
-              $add = false;
-            }
-          }
-          if (!$add) {
-            continue;
-          }
-
-          $q->push([$neighbour, [$neighbour, ...$lan]]);
-        }
-      }
-      if (count($lan) > count($biggestLan)) {
-        $biggestLan = $lan;
-        $checked->add(...$biggestLan);
-      }
-    }
+    $biggestLan = $this->getBiggestLan($connections);
 
     sort($biggestLan);
 
-    return $biggestLan;
+    return implode(',', $biggestLan);
+  }
+
+  protected function getBiggestLan($connections) {
+    $networks = new \Ds\Set();
+    foreach ($connections as $pc => $linked) {
+      $network = [$pc, ...$linked];
+      sort($network);
+      $networks->add($network);
+    }
+
+    $networkWithBiggestLan = null;
+    $biggestLanMask = 0;
+    $size = 0;
+    foreach ($networks as $network) {
+      $networkPcsByMask = array_combine(array_map(fn ($v) => 1 << $v, range(0, count($network) - 1)), $network);
+      foreach($this->getAllMasks(count($networkPcsByMask), $size) as $possibleLanMask) {
+        if (substr_count(decbin($possibleLanMask), '1') <= $size) {
+          continue;
+        }
+        if (!$this->isValidLan($possibleLanMask, $networkPcsByMask, $connections)) {
+          continue;
+        }
+        $size = substr_count(decbin($possibleLanMask), '1');
+        $biggestLanMask = $possibleLanMask;
+        $networkWithBiggestLan = $networkPcsByMask;
+      }
+    }
+
+    $pcMasks = $this->bitsInMask($biggestLanMask);
+
+    return array_intersect_key($networkWithBiggestLan, array_combine($pcMasks, $pcMasks));
+  }
+
+  protected function getAllMasks($length, $size) {
+    $masks = range(bindec(str_repeat('1', $size + 1)), bindec(str_repeat('1', $length)));
+    usort($masks, function ($a, $b) {
+      $bina = decbin($a);
+      $binb = decbin($b);
+      $result = substr_count($binb, '1') - substr_count($bina, '1');
+      return $result === 0 ? strlen($bina) - strlen($binb) : $result;
+    });
+    return array_filter($masks, function ($v) use ($size) { return substr_count(decbin($v), '1') > $size; });
+  }
+
+  protected function isValidLan($lanMask, $networkMasks, $connections) {
+    foreach ($this->bitsInMask($lanMask) as $lanPcMask) {
+      foreach ($this->bitsInMask($lanMask & $this->bitwiseNot($lanPcMask)) as $otherPcMask) {
+        if (!in_array($networkMasks[$lanPcMask], $connections[$networkMasks[$otherPcMask]])) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  protected function bitwiseNot($mask) {
+    $len = strlen(decbin($mask));
+    // "All 1" mask to fix PHP's weird "bitwise not" behavior.
+    $fixMask = (1 << $len) - 1;
+
+    return ~$mask & $fixMask;
+  }
+
+  protected function bitsInMask($mask) {
+    $bits = [];
+    $len = strlen(decbin($mask));
+    for($i = 0; $i < $len; $i++) {
+      $bit = 1 << $i;
+      if ($mask & $bit) {
+        $bits[] = $bit;
+      }
+    }
+
+    return $bits;
   }
 }
