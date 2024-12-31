@@ -9,52 +9,88 @@ class Puzzle2 extends Puzzle1 {
 
     $input = trim(file_get_contents($this->input));
     list($valuesDescriptions, $gateDescriptions) = explode("\n\n", $input);
-    $xBin = $yBin = '';
+    $xBin = $yBin = [];
     $inputValues = [];
     foreach (explode("\n", $valuesDescriptions) as $v) {
       list($key, $value) = explode(': ', $v);
       $inputValues[$key] = intval($value);
       switch(substr($key, 0, 1)) {
         case 'x':
-          $xBin .= $value;
+          $xBin[$key] = $value;
           break;
         case 'y':
-          $yBin .= $value;
+          $yBin[$key] = $value;
           break;
       }
     }
 
+    krsort($xBin);
+    krsort($yBin);
+
+    $xBin = implode($xBin);
+    $yBin = implode($yBin);
+
     $gates = [];
-    $dependencies = [];
+    $gatesByPair = new \Ds\Map();
+
     foreach (explode("\n", $gateDescriptions) as $gateDescription) {
       list($in1, $operator, $in2, , $output) = explode(' ', $gateDescription);
       $gates[$output] = [$in1, $in2, $operator, $output];
+      $pair = [$in1, $in2];
+      sort($pair);
+      $gatesByPair->put($pair, [$in1, $in2, $operator, $output]);
     }
 
-    for ($i = 0; $i < 44; $i++) {
-      $inputValues['x' . str_pad($i, 2, '0', STR_PAD_LEFT)] = 0;
-      $inputValues['y' . str_pad($i, 2, '0', STR_PAD_LEFT)] = 1;
-    }
-    list($values, $paths) = $this->resolveKahns($gates, $inputValues);
-    $values = array_filter($values, fn($k) => substr($k, 0, 1) === 'z', ARRAY_FILTER_USE_KEY);
-    krsort($values);
-    $endgates = array_keys($values);
-
-    $real = implode('', array_map('strval', $values));
     $expected = bindec($xBin) + bindec($yBin);
-    $mismatch = bindec($real) ^ $expected;
-
-    $pairUsage = new \Ds\Set();
-    foreach ($this->bitPositionsInMask($mismatch) as $position) {
-      $pairUsage = $pairUsage->merge($paths[$endgates[$position]]);
+    $swapped = new \Ds\Set();
+    while (true) {
+      list($values, $paths) = $this->resolveKahns($gates, $inputValues);
+      $values = array_filter($values, fn($k) => substr($k, 0, 1) === 'z', ARRAY_FILTER_USE_KEY);
+      $paths = array_filter($paths, fn($k) => substr($k, 0, 1) === 'z', ARRAY_FILTER_USE_KEY);
+      krsort($values);
+      $wrongBit = $this->getLeastSignificantWrongBit($values, $expected);
+      if ($wrongBit === -1) {
+        break;
+      }
+      $validPairs = new \Ds\Set();
+      for ($i = 0; $i < $wrongBit; $i++) {
+        $validPairs = $validPairs->merge($paths['z' . str_pad($i, 2, '0', STR_PAD_LEFT)]);
+      }
+      $invalidPairs = $paths['z' . str_pad($wrongBit, 2, '0', STR_PAD_LEFT)];
+      foreach ($invalidPairs->diff($validPairs) as $invalidPair) {
+        $gate1 = $gatesByPair->get($invalidPair);
+        foreach ($gates as $gate2) {
+          if ($gate1 === $gate2) {
+            continue;
+          }
+          $oldgates = $gates;
+          $gates[$gate1[3]] = $gate2;
+          $gates[$gate1[3]][3] = $gate1[3];
+          $gates[$gate2[3]] = $gate1;
+          $gates[$gate2[3]][3] = $gate2[3];
+          list($newValues, $newPaths) = $this->resolveKahns($gates, $inputValues);
+          $newValues = array_filter($newValues, fn($k) => substr($k, 0, 1) === 'z', ARRAY_FILTER_USE_KEY);
+          $newPaths = array_filter($newPaths, fn($k) => substr($k, 0, 1) === 'z', ARRAY_FILTER_USE_KEY);
+          krsort($newValues);
+          $newWrongBit = $this->getLeastSignificantWrongBit($newValues, $expected);
+          if (($newWrongBit <= $wrongBit && $newWrongBit !== -1) || count($newValues) !== strlen(decbin($expected))) {
+            $gates = $oldgates;
+            continue;
+          }
+          $pair1 = [$gates[$gate1[3]][0], $gates[$gate1[3]][1]];
+          $pair2 = [$gates[$gate2[3]][0], $gates[$gate2[3]][1]];
+          $swapped->add($gate1[3]);
+          $swapped->add($gate2[3]);
+          sort($pair1);
+          sort($pair2);
+          $gatesByPair->put($pair1, $gate1);
+          $gatesByPair->put($pair2, $gate2);
+          continue 2;
+        }
+      }
     }
-
-    arsort($pairUsage);
-    foreach ($pairUsage as $pair) {
-      
-    }
-
-    return count($pairUsage);
+    $swapped->sort();
+    return implode(',', $swapped->toArray());
   }
 
   protected function resolveKahns(array $gates, array $values) {
@@ -116,6 +152,12 @@ class Puzzle2 extends Puzzle1 {
     }
 
     return [$values, $valuePaths];
+  }
+
+  protected function getLeastSignificantWrongBit($values, $expected) {
+    $real = implode('', array_map('strval', $values));
+    $mismatch = bindec($real) ^ $expected;
+    return $mismatch > 0 ? min($this->bitPositionsInMask($mismatch)) : -1;
   }
 
   protected function bitPositionsInMask($mask) {
