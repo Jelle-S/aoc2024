@@ -46,8 +46,10 @@ class Puzzle2 extends Puzzle1 {
     while (true) {
       list($values, $paths) = $this->resolveKahns($gates, $inputValues);
       $values = array_filter($values, fn($k) => substr($k, 0, 1) === 'z', ARRAY_FILTER_USE_KEY);
-      $paths = array_filter($paths, fn($k) => substr($k, 0, 1) === 'z', ARRAY_FILTER_USE_KEY);
+      //$paths = array_filter($paths, fn($k) => substr($k, 0, 1) === 'z', ARRAY_FILTER_USE_KEY);
       krsort($values);
+      krsort($paths);
+      var_dump($paths['z00'],$paths['z01'], $paths['njb'], $paths['tkb']); exit;
       $wrongBit = $this->getLeastSignificantWrongBit($values, $expected);
       if ($wrongBit === -1) {
         break;
@@ -128,12 +130,10 @@ class Puzzle2 extends Puzzle1 {
         // All the inputs of this gate are resolved, process it and add it to
         // the queue.
         if ($indegrees[$output] === 0) {
-
-          $valuePaths[$output] = $valuePaths[$current]->copy();
+          $valuePaths[$output] ??= $valuePaths[$current]->copy();
           $pair = [$in1, $in2];
           sort($pair);
-          $valuePaths[$output]->add($pair);
-
+          $valuePaths[$output]->add(implode(' ', [...$pair, $operator, $output]));
           switch ($operator) {
             case 'AND':
               $values[$output] = $values[$in1] & $values[$in2];
